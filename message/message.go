@@ -7,8 +7,9 @@ import (
 
 // Message is a struct that represents a message
 type Message struct {
-	Username string
-	Message  string
+	Username    string
+	Message     string
+	MessageType string
 }
 
 // send message to a connection

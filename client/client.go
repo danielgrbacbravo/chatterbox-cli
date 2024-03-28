@@ -28,6 +28,8 @@ func Client(username, dialAddress string) {
 	initialModel.username = username
 	initialModel.conn = conn
 
+	sendJoinMessage(conn, username)
+
 	programChan := make(chan *tea.Program, 1) // create a channel to pass the Bubbletea program
 
 	go listenForMessages(conn, programChan) // pass the channel to the goroutine
@@ -45,7 +47,6 @@ func listenForMessages(conn net.Conn, programChan chan *tea.Program) {
 	for {
 		msg, err := message.ReadMessage(conn)
 		if err != nil {
-			log.Error("Error reading message:", "err", err)
 			return
 		}
 		p.Send(incomingMsg(msg))
@@ -84,7 +85,7 @@ func initialModel() model {
 
 	ta.ShowLineNumbers = false
 
-	vp := viewport.New(30, 5)
+	vp := viewport.New(60, 10)
 	vp.SetContent(`Welcome to the chat room!
 Type a message and press Enter to send.`)
 
@@ -115,9 +116,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case incomingMsg:
+		if msg.MessageType == "join" {
+			m.messages = append(m.messages, m.senderStyle.Render(msg.Username+" joined the chat"))
+			m.viewport.SetContent(strings.Join(m.messages, "\n"))
+			m.viewport.GotoBottom()
+			break
+		}
+
+		if msg.MessageType == "leave" {
+			m.messages = append(m.messages, m.senderStyle.Render(msg.Username+" left the chat"))
+			m.viewport.SetContent(strings.Join(m.messages, "\n"))
+			m.viewport.GotoBottom()
+			break
+		}
+
 		if msg.Username == m.username {
 			break
 		}
+
 		m.messages = append(m.messages, m.senderStyle.Render(msg.Username+": ")+msg.Message)
 		m.viewport.SetContent(strings.Join(m.messages, "\n"))
 		m.textarea.Reset()
@@ -128,7 +144,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			fmt.Println(m.textarea.Value())
 			return m, tea.Quit
 		case tea.KeyEnter:
-			msg := message.Message{Username: m.username, Message: m.textarea.Value()}
+			msg := message.Message{Username: m.username, Message: m.textarea.Value(), MessageType: "message"}
 			if m.conn == nil {
 				log.Error("Connection is nil, cannot send message")
 				break
@@ -156,4 +172,9 @@ func (m model) View() string {
 		m.viewport.View(),
 		m.textarea.View(),
 	) + "\n\n"
+}
+
+func sendJoinMessage(conn net.Conn, username string) {
+	msg := message.Message{Username: username, MessageType: "join"}
+	msg.SendMessage(conn)
 }
