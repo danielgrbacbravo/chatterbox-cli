@@ -11,20 +11,20 @@ import (
 var clients = make([]*net.Conn, 0)
 
 func Server() {
-	log.Debug("Starting server")
-	// print the server address
 	var ip = getOutboundIP()
+	log.Debug("Server starting...")
 	log.Debug("Server address:", "addr", ip.String())
 
 	// construct chat room info message
 
 	// Listen on TCP port 8080 on all available unicast and
 	// anycast IP addresses of the local system.
-	listener, err := net.Listen("tcp", ":8080")
+	listener, err := net.Listen("tcp", ":5051")
 	if err != nil {
 		log.Error("Error listening:", "err", err)
 		return
 	}
+	log.Debug("listener created successfully", "addr", listener.Addr().String())
 	defer listener.Close()
 
 	for {
@@ -34,7 +34,7 @@ func Server() {
 			log.Error("Error accepting connection:", "err", err)
 			return
 		}
-
+		log.Info("creating new thread for connection", "addr", conn.RemoteAddr().String())
 		go handleConnection(conn) // Handle the connection in a new goroutine.
 	}
 }
@@ -48,7 +48,6 @@ func handleConnection(conn net.Conn) {
 		msg := constructLeaveMessage(username)
 		msg.BroadcastMessage(clients)
 		// remove the connection from the clients slice
-
 		log.Warn("closing connection ", "addr", conn.RemoteAddr().String())
 		for i, client := range clients {
 			if client == &conn {

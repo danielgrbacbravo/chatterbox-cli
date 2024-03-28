@@ -29,8 +29,8 @@ func main() {
 	// if there is no address or username, open the login prompt
 	if dialAddress == "" && username == "" {
 		username, dialAddress := login.FetchLoginData()
-		//append the port to the address
-		dialAddress = dialAddress + ":8080"
+		//append the port to the address (default is 5051)
+		dialAddress = dialAddress + ":5051"
 		log.Debug("formatted IP", "ip", dialAddress)
 		client.Client(username, dialAddress)
 		return
