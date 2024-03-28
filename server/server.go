@@ -8,11 +8,6 @@ import (
 	log "github.com/charmbracelet/log"
 )
 
-type Messsage struct {
-	Username string
-	Message  string
-}
-
 var clients = make([]*net.Conn, 0)
 
 func Server() {
@@ -77,6 +72,7 @@ func handleConnection(conn net.Conn) {
 			log.Error("Error broadcasting message:", "err", err)
 			return
 		}
+		log.Debug("Message broadcasted", "msg", msg.Message, "username", msg.Username, "type", msg.MessageType)
 	}
 }
 
