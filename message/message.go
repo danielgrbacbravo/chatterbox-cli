@@ -19,16 +19,6 @@ func (m *Message) SendMessage(conn net.Conn) error {
 	return enc.Encode(m)
 }
 
-func (m *Message) BroadcastMessage(clients []*net.Conn) error {
-	for _, client := range clients {
-		err := m.SendMessage(*client)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func ReadMessage(conn net.Conn) (Message, error) {
 	dec := gob.NewDecoder(conn)
 	var msg Message

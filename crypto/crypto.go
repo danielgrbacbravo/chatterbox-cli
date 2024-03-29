@@ -81,15 +81,27 @@ func Decrypt(securedMessage string, secret *big.Int) (decodedmess string) {
 	return
 }
 
-func sendPublicKey(conn net.Conn, publicKey ecdsa.PublicKey) {
+func SendPublicKey(conn net.Conn, publicKey ecdsa.PublicKey) {
 	message := message.Message{
-		MessageType: "publicKey",
+		MessageType: "public_key",
 		Message:     publicKey.X.String() + "," + publicKey.Y.String(),
 	}
 	message.SendMessage(conn)
 }
 
-func receivePublicKey(conn net.Conn) ecdsa.PublicKey {
+func ConvertToPublicKey(message message.Message) ecdsa.PublicKey {
+	xySlice := strings.Split(message.Message, ",")
+	x, _ := new(big.Int).SetString(xySlice[0], 10)
+	y, _ := new(big.Int).SetString(xySlice[1], 10)
+
+	publicKey := ecdsa.PublicKey{
+		X: x,
+		Y: y,
+	}
+	return publicKey
+}
+
+func ReceivePublicKey(conn net.Conn) ecdsa.PublicKey {
 	msg, err := message.ReadMessage(conn)
 	if err != nil {
 		log.Fatal(err)
@@ -137,8 +149,16 @@ func EncyptMessage(message message.Message, secret *big.Int) message.Message {
 	message.Message = Encrypt(message.Message, secret)
 	return message
 }
+
 func DecryptMessage(message message.Message, secret *big.Int) message.Message {
 	message.Username = Decrypt(message.Username, secret)
 	message.Message = Decrypt(message.Message, secret)
 	return message
+}
+
+func BroadcastMessage(message message.Message, clients []*net.Conn, sharedKeys map[net.Conn]*big.Int) {
+	for _, client := range clients {
+		message := EncyptMessage(message, sharedKeys[*client])
+		message.SendMessage(*client)
+	}
 }

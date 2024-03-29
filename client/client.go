@@ -1,8 +1,11 @@
 package client
 
 import (
+	"crypto/ecdsa"
 	"fmt"
+	"go-chat-cli/crypto"
 	"go-chat-cli/message"
+	"math/big"
 	"net"
 	"strings"
 
@@ -14,8 +17,19 @@ import (
 )
 
 var conn net.Conn
+var publicKey ecdsa.PublicKey
+var privateKey *ecdsa.PrivateKey
+
+// server public key
+var serverPublicKey ecdsa.PublicKey
 
 func Client(username, dialAddress string) {
+
+	// construct private key
+	privateKey = crypto.GeneratePrivateKey()
+	log.Debug("client private key generated ")
+	publicKey = crypto.GeneratePublicKey(privateKey)
+	log.Debug("client public key generated")
 
 	conn, err := net.Dial("tcp", dialAddress)
 	if err != nil {
@@ -28,6 +42,7 @@ func Client(username, dialAddress string) {
 	initialModel.username = username
 	initialModel.conn = conn
 
+	// begin aes encryption handshake
 	sendJoinMessage(conn, username)
 
 	programChan := make(chan *tea.Program, 1) // create a channel to pass the Bubbletea program
@@ -67,6 +82,8 @@ type model struct {
 	senderStyle lipgloss.Style
 	err         error
 	conn        net.Conn
+	serverKey   ecdsa.PublicKey
+	sharedKey   *big.Int
 }
 
 func initialModel() model {
@@ -99,6 +116,8 @@ Type a message and press Enter to send.`)
 		senderStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("5")),
 		err:         nil,
 		conn:        nil,
+		serverKey:   ecdsa.PublicKey{},
+		sharedKey:   nil,
 	}
 }
 func (m model) Init() tea.Cmd {
@@ -116,28 +135,48 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case incomingMsg:
-		if msg.MessageType == "join" {
-			m.messages = append(m.messages, m.senderStyle.Render(msg.Username+" joined the chat"))
+		if msg.MessageType == "public_key" {
+			// server has sent public key
+			// save it to the model
+			m.serverKey = crypto.ConvertToPublicKey(message.Message(msg))
+			log.Debug("Received public key from server 🔑")
+			crypto.SendPublicKey(m.conn, publicKey)
+			log.Debug("Sent public key to server 🔑")
+			// condition at current state
+			// both client and server have exchanged public keys
+			m.sharedKey = crypto.GenerateSharedSecret(privateKey, m.serverKey)
+			log.Debug("Shared key generated 🔑")
+			// diffie hellman key exchange complete
+			log.Debug("Diffie Hellman key exchange complete 🔒")
+			break
+		}
+		// decrypt message
+		decryptedMessage := crypto.DecryptMessage(message.Message(msg), m.sharedKey)
+
+		// check if message is a join message
+		if decryptedMessage.MessageType == "join" {
+			m.messages = append(m.messages, m.senderStyle.Render(decryptedMessage.Username+" joined the chat"))
 			m.viewport.SetContent(strings.Join(m.messages, "\n"))
 			m.viewport.GotoBottom()
 			break
 		}
-
-		if msg.MessageType == "leave" {
-			m.messages = append(m.messages, m.senderStyle.Render(msg.Username+" left the chat"))
+		// check if message is a leave message
+		if decryptedMessage.MessageType == "leave" {
+			m.messages = append(m.messages, m.senderStyle.Render(decryptedMessage.Username+" left the chat"))
 			m.viewport.SetContent(strings.Join(m.messages, "\n"))
 			m.viewport.GotoBottom()
 			break
 		}
-
-		if msg.Username == m.username {
+		// check if the message is from the current user
+		if decryptedMessage.Username == m.username {
 			break
 		}
-
-		m.messages = append(m.messages, m.senderStyle.Render(msg.Username+": ")+msg.Message)
+		// add message to the model
+		m.messages = append(m.messages, m.senderStyle.Render(decryptedMessage.Username+": ")+decryptedMessage.Message)
 		m.viewport.SetContent(strings.Join(m.messages, "\n"))
 		m.textarea.Reset()
 		m.viewport.GotoBottom()
+
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyCtrlC, tea.KeyEsc:
@@ -149,8 +188,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				log.Error("Connection is nil, cannot send message")
 				break
 			}
-			msg.SendMessage(m.conn)
+			// add message to the model
 			m.messages = append(m.messages, m.senderStyle.Render("You: ")+m.textarea.Value())
+			// encrypt message
+			encryptedMsg := crypto.EncyptMessage(msg, m.sharedKey)
+			encryptedMsg.SendMessage(m.conn)
 			m.viewport.SetContent(strings.Join(m.messages, "\n"))
 			m.textarea.Reset()
 			m.viewport.GotoBottom()

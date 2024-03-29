@@ -1,21 +1,33 @@
 package server
 
 import (
+	"crypto/ecdsa"
+	"math/big"
 	"net"
 
+	"go-chat-cli/crypto"
 	"go-chat-cli/message"
 
 	log "github.com/charmbracelet/log"
 )
 
 var clients = make([]*net.Conn, 0)
+var serverPrivateKey *ecdsa.PrivateKey
+var serverPublicKey ecdsa.PublicKey
+
+// map of client public keys to their connections
+var sharedKeys = make(map[net.Conn]*big.Int)
 
 func Server() {
 	var ip = getOutboundIP()
-	log.Debug("Server starting...")
-	log.Debug("Server address:", "addr", ip.String())
+	log.Info("Server starting...")
+	log.Info("Server address:", "addr", ip.String())
 
-	// construct chat room info message
+	// construct server public key
+	log.Info("generating server public key...")
+	serverPrivateKey = crypto.GeneratePrivateKey()
+	serverPublicKey = crypto.GeneratePublicKey(serverPrivateKey)
+	log.Info("server public key generated")
 
 	// Listen on TCP port 8080 on all available unicast and
 	// anycast IP addresses of the local system.
@@ -41,12 +53,21 @@ func Server() {
 
 func handleConnection(conn net.Conn) {
 	var username string
+	var clientPublicKey ecdsa.PublicKey
+	var sharedKey *big.Int
+
+	// establish connection with client
+	crypto.SendPublicKey(conn, serverPublicKey)
+	log.Info("server public key sent to client")
 	defer conn.Close()
 	clients = append(clients, &conn)
+
+	// construct the join message
+
+	// defer the leave message
 	defer func() {
-		// send a leave message to all clients
 		msg := constructLeaveMessage(username)
-		msg.BroadcastMessage(clients)
+		crypto.BroadcastMessage(msg, clients, sharedKeys)
 		// remove the connection from the clients slice
 		log.Warn("closing connection ", "addr", conn.RemoteAddr().String())
 		for i, client := range clients {
@@ -56,21 +77,43 @@ func handleConnection(conn net.Conn) {
 			}
 		}
 	}()
+	// read the client public key
 	for {
 		msg, err := message.ReadMessage(conn)
 		if err != nil {
 			return
 		}
+		if msg.MessageType == "public_key" {
+			clientPublicKey = crypto.ConvertToPublicKey(msg)
+			log.Info("client public key received")
+			sharedKey = crypto.GenerateSharedSecret(serverPrivateKey, clientPublicKey)
+			log.Info("Diffie Hellman key exchange complete")
+			sharedKeys[conn] = sharedKey
+			break
+		}
+	}
+
+	// read messages from the connection
+	for {
+		msg, err := message.ReadMessage(conn)
+		if err != nil {
+			return
+		}
+		// decrypt message
+		log.Debug("Message received", "msg", msg.Message, "username", msg.Username, "type", msg.MessageType)
+		log.Debug("decrypting message ...")
+		decryptedMessage := crypto.DecryptMessage(msg, sharedKey)
+		log.Debug("decrypted message", "msg", decryptedMessage.Message, "username", decryptedMessage.Username, "type", decryptedMessage.MessageType)
+
 		if username == "" {
-			username = msg.Username
+			// decrypt message
+			// decrypt message using shared key
+			username = decryptedMessage.Username
 			log.Info("username registered to connection handler", "username", username)
 		}
 
-		err = msg.BroadcastMessage(clients)
-		if err != nil {
-			log.Error("Error broadcasting message:", "err", err)
-			return
-		}
+		// re-encrypt message using shared key and broadcast
+		crypto.BroadcastMessage(decryptedMessage, clients, sharedKeys)
 		log.Debug("Message broadcasted", "msg", msg.Message, "username", msg.Username, "type", msg.MessageType)
 	}
 }
@@ -98,5 +141,13 @@ func constructLeaveMessage(username string) message.Message {
 		Username:    username,
 		Message:     "",
 		MessageType: "leave",
+	}
+}
+
+func constructJoinMessage(username string) message.Message {
+	return message.Message{
+		Username:    username,
+		Message:     "",
+		MessageType: "join",
 	}
 }

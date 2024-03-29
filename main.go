@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/gob"
 	"flag"
+	"fmt"
 	"go-chat-cli/client"
 	"go-chat-cli/login"
 	"go-chat-cli/message"
@@ -29,6 +30,8 @@ func main() {
 	// if there is no address or username, open the login prompt
 	if dialAddress == "" && username == "" {
 		username, dialAddress := login.FetchLoginData()
+		// clear the terminal
+		fmt.Print("\033[H\033[2J")
 		//append the port to the address (default is 5051)
 		dialAddress = dialAddress + ":5051"
 		log.Debug("formatted IP", "ip", dialAddress)
