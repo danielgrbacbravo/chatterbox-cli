@@ -16,6 +16,9 @@ import (
 	"strings"
 )
 
+// using the elliptic curve digital signature algorithm (ECDSA) to generate a private key
+// and the diffie-hellman key exchange algorithm to generate a shared secret
+
 // / GeneratePrivateKey generates a private key
 func GeneratePrivateKey() *ecdsa.PrivateKey {
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -127,4 +130,15 @@ func Encrypt(message string, secret *big.Int) (encmess string) {
 	// convert to base64
 	encmess = base64.URLEncoding.EncodeToString(ciphertext)
 	return
+}
+
+func EncyptMessage(message message.Message, secret *big.Int) message.Message {
+	message.Username = Encrypt(message.Username, secret)
+	message.Message = Encrypt(message.Message, secret)
+	return message
+}
+func DecryptMessage(message message.Message, secret *big.Int) message.Message {
+	message.Username = Decrypt(message.Username, secret)
+	message.Message = Decrypt(message.Message, secret)
+	return message
 }
