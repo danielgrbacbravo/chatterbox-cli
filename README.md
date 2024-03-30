@@ -38,9 +38,25 @@ This will start the client. You will be prompted to enter a username and the ser
 
 ![Client Command](./gifs/client.gif)
 
+## Dockerfile
+
+"Dockerfile" is included in the project directory. To build the Docker image, run the following command:
+
+```bash
+sudo docker build -t chatterbox .
+```
+
+To run the Docker container, execute the following command:
+
+```bash
+sudo docker run -it -p 5051: 5051 chatterbox
+```
+
+This will start the server inside the Docker container. You can then run the client on your local machine to connect to the server.
+
 ## Learning Experience
 
-This project is a great exercise in understanding network programming with Go, cryptography for secure communication, and building terminal user interfaces with the Bubbletea library. It provides a hands-on learning experience on how to handle multiple client connections in a server, how to perform key exchanges for secure communication, and how to build and manage user interfaces in the terminal.
+In this project, I dove into the intricacies of network programming using Go, explored the realm of cryptography for ensuring secure communication, and tackled the challenge of building user interfaces in the terminal with the help of the Bubbletea library. My journey was marked by the hands-on experience of managing multiple client connections on a server, implementing key exchanges for securing those connections, and mastering the creation and manipulation of terminal-based user interfaces. This undertaking was not just about coding; it was about learning, exploring, and pushing the boundaries of what I could achieve with these technologies.
 
 ## Note
 
