@@ -1,13 +1,13 @@
 package main
 
 import (
-	"encoding/gob"
-	"flag"
-	"fmt"
 	"chatterbox-cli/client"
 	"chatterbox-cli/login"
 	"chatterbox-cli/message"
 	"chatterbox-cli/server"
+	"encoding/gob"
+	"flag"
+	"fmt"
 
 	log "github.com/charmbracelet/log"
 )
@@ -34,18 +34,15 @@ func main() {
 		fmt.Print("\033[H\033[2J")
 		//append the port to the address (default is 5051)
 		dialAddress = dialAddress + ":5051"
-		log.Debug("formatted IP", "ip", dialAddress)
 		client.Client(username, dialAddress)
 		return
 	}
 	// if there is no address but there is a username, throw an error
 	if dialAddress == "" {
-		log.Error("Please provide an address")
 		return
 	}
 	// if there is no username but there is an address, throw an error
 	if username == "" {
-		log.Error("Please provide a username")
 		return
 	}
 

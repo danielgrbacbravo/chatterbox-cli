@@ -27,13 +27,10 @@ func Client(username, dialAddress string) {
 
 	// construct private key
 	privateKey = crypto.GeneratePrivateKey()
-	log.Debug("client private key generated ")
 	publicKey = crypto.GeneratePublicKey(privateKey)
-	log.Debug("client public key generated")
 
 	conn, err := net.Dial("tcp", dialAddress)
 	if err != nil {
-		log.Error("Error dialing:", "err", err)
 		return
 	}
 	defer conn.Close()
@@ -139,15 +136,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// server has sent public key
 			// save it to the model
 			m.serverKey = crypto.ConvertToPublicKey(message.Message(msg))
-			log.Debug("Received public key from server 🔑")
 			crypto.SendPublicKey(m.conn, publicKey)
-			log.Debug("Sent public key to server 🔑")
 			// condition at current state
 			// both client and server have exchanged public keys
 			m.sharedKey = crypto.GenerateSharedSecret(privateKey, m.serverKey)
-			log.Debug("Shared key generated 🔑")
 			// diffie hellman key exchange complete
-			log.Debug("Diffie Hellman key exchange complete 🔒")
 			break
 		}
 		// decrypt message
