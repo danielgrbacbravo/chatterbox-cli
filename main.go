@@ -4,10 +4,10 @@ import (
 	"encoding/gob"
 	"flag"
 	"fmt"
-	"go-chat-cli/client"
-	"go-chat-cli/login"
-	"go-chat-cli/message"
-	"go-chat-cli/server"
+	"chatterbox-cli/client"
+	"chatterbox-cli/login"
+	"chatterbox-cli/message"
+	"chatterbox-cli/server"
 
 	log "github.com/charmbracelet/log"
 )
