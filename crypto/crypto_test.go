@@ -1,7 +1,7 @@
 package crypto_test
 
 import (
-	"go-chat-cli/crypto"
+	"chatterbox-cli/crypto"
 	"testing"
 
 	log "github.com/charmbracelet/log"

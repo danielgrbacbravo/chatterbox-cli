@@ -5,8 +5,8 @@ import (
 	"math/big"
 	"net"
 
-	"go-chat-cli/crypto"
-	"go-chat-cli/message"
+	"chatterbox-cli/crypto"
+	"chatterbox-cli/message"
 
 	log "github.com/charmbracelet/log"
 )

@@ -1,10 +1,10 @@
 package client
 
 import (
+	"chatterbox-cli/crypto"
+	"chatterbox-cli/message"
 	"crypto/ecdsa"
 	"fmt"
-	"go-chat-cli/crypto"
-	"go-chat-cli/message"
 	"math/big"
 	"net"
 	"strings"

@@ -1,4 +1,4 @@
-module go-chat-cli
+module chatterbox-cli
 
 go 1.22.1
 

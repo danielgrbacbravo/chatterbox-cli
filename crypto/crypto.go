@@ -1,6 +1,7 @@
 package crypto
 
 import (
+	"chatterbox-cli/message"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/ecdsa"
@@ -8,7 +9,6 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
-	"go-chat-cli/message"
 	"io"
 	"log"
 	"math/big"
