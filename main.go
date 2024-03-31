@@ -24,7 +24,7 @@ func main() {
 	flag.Parse()
 
 	if isServer {
-		server.Server()
+		server.Server(username)
 		return
 	}
 	// if there is no address or username, open the login prompt

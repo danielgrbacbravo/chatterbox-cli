@@ -81,10 +81,11 @@ func Decrypt(securedMessage string, secret *big.Int) (decodedmess string) {
 	return
 }
 
-func SendPublicKey(conn net.Conn, publicKey ecdsa.PublicKey) {
+func SendPublicKey(serverName string, conn net.Conn, publicKey ecdsa.PublicKey) {
 	message := message.Message{
 		MessageType: "public_key",
 		Message:     publicKey.X.String() + "," + publicKey.Y.String(),
+		Username:    serverName,
 	}
 	message.SendMessage(conn)
 }

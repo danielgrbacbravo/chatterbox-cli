@@ -8,8 +8,16 @@ import (
 	"chatterbox-cli/crypto"
 	"chatterbox-cli/message"
 
+	"github.com/charmbracelet/lipgloss"
 	log "github.com/charmbracelet/log"
 )
+
+const SuccessLevel = log.InfoLevel + 2
+const MessageLevel = log.InfoLevel + 1
+const DisconnectLevel = log.InfoLevel + 3
+
+const decryptLevel = log.InfoLevel + 4
+const encryptLevel = log.InfoLevel + 5
 
 var clients = make([]*net.Conn, 0)
 var serverPrivateKey *ecdsa.PrivateKey
@@ -18,7 +26,36 @@ var serverPublicKey ecdsa.PublicKey
 // map of client public keys to their connections
 var sharedKeys = make(map[net.Conn]*big.Int)
 
-func Server() {
+func Server(serverName string) {
+	//success message
+	styles := log.DefaultStyles()
+	styles.Levels[SuccessLevel] = lipgloss.NewStyle().
+		SetString("SUCCESS").
+		Bold(true).
+		Foreground(lipgloss.Color("42"))
+
+	styles.Levels[MessageLevel] = lipgloss.NewStyle().
+		SetString("MESSAGE").
+		Bold(true).
+		Foreground(lipgloss.Color("39"))
+
+	styles.Levels[DisconnectLevel] = lipgloss.NewStyle().
+		SetString("DISCONNECT").
+		Bold(true).
+		Foreground(lipgloss.Color("208"))
+
+	styles.Levels[decryptLevel] = lipgloss.NewStyle().
+		SetString("DECRYPT").
+		Bold(true).
+		Foreground(lipgloss.Color("199"))
+
+	styles.Levels[encryptLevel] = lipgloss.NewStyle().
+		SetString("ENCRYPT").
+		Bold(true).
+		Foreground(lipgloss.Color("199"))
+
+	log.SetStyles(styles)
+
 	var ip = getOutboundIP()
 	log.Info("Server starting...")
 	log.Info("Server address:", "addr", ip.String())
@@ -36,7 +73,7 @@ func Server() {
 		log.Error("Error listening:", "err", err)
 		return
 	}
-	log.Debug("listener created successfully", "addr", listener.Addr().String())
+	Success("Server started successfully", "addr", listener.Addr().String())
 	defer listener.Close()
 
 	for {
@@ -46,19 +83,19 @@ func Server() {
 			log.Error("Error accepting connection:", "err", err)
 			return
 		}
-		log.Info("creating new thread for connection", "addr", conn.RemoteAddr().String())
-		go handleConnection(conn) // Handle the connection in a new goroutine.
+		Success("creating new thread for connection", "addr", conn.RemoteAddr().String())
+		go handleConnection(serverName, conn) // Handle the connection in a new goroutine.
 	}
 }
 
-func handleConnection(conn net.Conn) {
+func handleConnection(servername string, conn net.Conn) {
 	var username string
 	var clientPublicKey ecdsa.PublicKey
 	var sharedKey *big.Int
 
 	// establish connection with client
-	crypto.SendPublicKey(conn, serverPublicKey)
-	log.Info("server public key sent to client")
+	crypto.SendPublicKey(servername, conn, serverPublicKey)
+	log.Debug("server public key sent to client")
 	defer conn.Close()
 	clients = append(clients, &conn)
 
@@ -69,7 +106,7 @@ func handleConnection(conn net.Conn) {
 		msg := constructLeaveMessage(username)
 		crypto.BroadcastMessage(msg, clients, sharedKeys)
 		// remove the connection from the clients slice
-		log.Warn("closing connection ", "addr", conn.RemoteAddr().String())
+		Disconnect("closing connection", "addr", conn.RemoteAddr().String())
 		for i, client := range clients {
 			if client == &conn {
 				clients = append(clients[:i], clients[i+1:]...)
@@ -87,7 +124,7 @@ func handleConnection(conn net.Conn) {
 			clientPublicKey = crypto.ConvertToPublicKey(msg)
 			log.Info("client public key received")
 			sharedKey = crypto.GenerateSharedSecret(serverPrivateKey, clientPublicKey)
-			log.Info("Diffie Hellman key exchange complete")
+			Success("Diffie Hellman key exchange complete", "sharedKey", sharedKey)
 			sharedKeys[conn] = sharedKey
 			break
 		}
@@ -100,8 +137,8 @@ func handleConnection(conn net.Conn) {
 			return
 		}
 		// decrypt message
-		log.Debug("Message received", "msg", msg.Message, "username", msg.Username, "type", msg.MessageType)
-		log.Debug("decrypting message ...")
+		Message("Message received", "msg", msg.Message, "username", msg.Username, "type", msg.MessageType)
+		Decrypt("decrypting message ...")
 		decryptedMessage := crypto.DecryptMessage(msg, sharedKey)
 		log.Debug("decrypted message", "msg", decryptedMessage.Message, "username", decryptedMessage.Username, "type", decryptedMessage.MessageType)
 
@@ -109,12 +146,12 @@ func handleConnection(conn net.Conn) {
 			// decrypt message
 			// decrypt message using shared key
 			username = decryptedMessage.Username
-			log.Info("username registered to connection handler", "username", username)
+			log.Debug("username registered to connection handler", "username", username)
 		}
-
 		// re-encrypt message using shared key and broadcast
+		Encrypt("encrypting message ...")
 		crypto.BroadcastMessage(decryptedMessage, clients, sharedKeys)
-		log.Debug("Message broadcasted", "msg", msg.Message, "username", msg.Username, "type", msg.MessageType)
+		Message("Message broadcasted", "msg", decryptedMessage.Message, "username", decryptedMessage.Username, "type", decryptedMessage.MessageType)
 	}
 }
 
@@ -150,4 +187,24 @@ func constructJoinMessage(username string) message.Message {
 		Message:     "",
 		MessageType: "join",
 	}
+}
+
+func Success(msg string, args ...any) {
+	log.Default().Log(SuccessLevel, msg, args...)
+}
+
+func Message(msg string, args ...any) {
+	log.Default().Log(MessageLevel, msg, args...)
+}
+
+func Disconnect(msg string, args ...any) {
+	log.Default().Log(DisconnectLevel, msg, args...)
+}
+
+func Encrypt(msg string, args ...any) {
+	log.Default().Log(encryptLevel, msg, args...)
+}
+
+func Decrypt(msg string, args ...any) {
+	log.Default().Log(decryptLevel, msg, args...)
 }

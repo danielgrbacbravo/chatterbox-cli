@@ -72,18 +72,24 @@ type (
 type incomingMsg message.Message
 
 type model struct {
-	viewport    viewport.Model
-	username    string
-	messages    []string
-	textarea    textarea.Model
-	senderStyle lipgloss.Style
-	err         error
-	conn        net.Conn
-	serverKey   ecdsa.PublicKey
-	sharedKey   *big.Int
+	viewport        viewport.Model
+	username        string
+	messages        []string
+	textarea        textarea.Model
+	senderStyle     lipgloss.Style
+	err             error
+	conn            net.Conn
+	serverNameStyle lipgloss.Style
+	serverName      string
+	serverKey       ecdsa.PublicKey
+	sharedKey       *big.Int
 }
 
 func initialModel() model {
+	title := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("205")).
+		Bold(true)
+
 	ta := textarea.New()
 	ta.Placeholder = "Send a message..."
 	ta.Focus()
@@ -106,15 +112,16 @@ Type a message and press Enter to send.`)
 	ta.KeyMap.InsertNewline.SetEnabled(false)
 
 	return model{
-		textarea:    ta,
-		username:    "",
-		messages:    []string{},
-		viewport:    vp,
-		senderStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("5")),
-		err:         nil,
-		conn:        nil,
-		serverKey:   ecdsa.PublicKey{},
-		sharedKey:   nil,
+		textarea:        ta,
+		username:        "",
+		messages:        []string{},
+		viewport:        vp,
+		senderStyle:     lipgloss.NewStyle().Foreground(lipgloss.Color("5")),
+		err:             nil,
+		conn:            nil,
+		serverNameStyle: title,
+		serverKey:       ecdsa.PublicKey{},
+		sharedKey:       nil,
 	}
 }
 func (m model) Init() tea.Cmd {
@@ -135,8 +142,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.MessageType == "public_key" {
 			// server has sent public key
 			// save it to the model
+			m.serverName = msg.Username
 			m.serverKey = crypto.ConvertToPublicKey(message.Message(msg))
-			crypto.SendPublicKey(m.conn, publicKey)
+			crypto.SendPublicKey(m.username, m.conn, publicKey)
 			// condition at current state
 			// both client and server have exchanged public keys
 			m.sharedKey = crypto.GenerateSharedSecret(privateKey, m.serverKey)
@@ -203,7 +211,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m model) View() string {
 	return fmt.Sprintf(
-		"%s\n\n%s",
+		"%s\n%s\n\n%s",
+		m.serverNameStyle.Render(m.serverName),
 		m.viewport.View(),
 		m.textarea.View(),
 	) + "\n\n"
