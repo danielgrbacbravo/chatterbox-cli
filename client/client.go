@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/big"
 	"net"
+	"os"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textarea"
@@ -56,6 +57,7 @@ func Client(username, dialAddress string) {
 
 func listenForMessages(conn net.Conn, programChan chan *tea.Program) {
 	p := <-programChan // receive the Bubbletea program from the channel
+	defer os.Exit(0)
 	for {
 		msg, err := message.ReadMessage(conn)
 		if err != nil {
