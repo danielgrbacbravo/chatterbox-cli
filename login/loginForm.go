@@ -52,12 +52,12 @@ func initialModel() model {
 	// username field
 	inputs[user] = textinput.New()
 	inputs[user].Placeholder = "Username"
-	inputs[user].Focus()
 	inputs[user].CharLimit = 20
 	inputs[user].Width = 30
 	inputs[user].Prompt = ""
 	// IP address field
 	inputs[ip] = textinput.New()
+	inputs[ip].Focus()
 	inputs[ip].Placeholder = "192.168.10.5"
 	inputs[ip].CharLimit = 15
 	inputs[ip].Width = 30
@@ -95,10 +95,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyTab, tea.KeyCtrlN:
 			m.nextInput()
 		}
+
 		for i := range m.inputs {
-			m.inputs[i].Blur()
+			if i == m.focused {
+				m.inputs[i].Focus()
+			} else {
+				m.inputs[i].Blur()
+			}
 		}
-		m.inputs[m.focused].Focus()
 
 	// We handle errors just like any other message
 	case errMsg:
@@ -107,7 +111,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	for i := range m.inputs {
-		m.inputs[i], cmds[i] = m.inputs[i].Update(msg)
+		if i == m.focused {
+			m.inputs[i], cmds[i] = m.inputs[i].Update(msg)
+		}
 	}
 	return m, tea.Batch(cmds...)
 }
