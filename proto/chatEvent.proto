@@ -1,0 +1,83 @@
+syntax = "proto3";
+
+package chatEvent;
+
+import "google/protobuf/timestamp.proto";
+option go_package = "proto/chatEvent;chatEvent";
+
+enum userStatus {
+  ONLINE = 0;
+  OFFLINE = 1;
+  DO_NOT_DISTURB = 2;
+  AWAY = 3;
+}
+
+// User message definition
+message User {
+  int32 userID = 1;                          // Unique identifier for the user
+  string emojiIcon = 2;                      // User's emoji icon
+  string userColor = 3;                      // User's preferred display color
+  string username = 4;                       // Unique username
+  string displayName = 5;                    // User-friendly name or nickname
+  userStatus status = 6;                     // User status (e.g., online, offline, away)
+  string bio = 7;                            // Short bio or description of the user
+  string languagePreference = 8;             // Preferred language of the user
+  string location = 9;                       // Geographical location of the user
+  bool notificationsEnabled = 10;            // Whether notifications are enabled for the user
+}
+
+// Message message definition
+message Message {
+  int32 messageID = 1;                       // Unique identifier for the message
+  User user = 2;                             // User who sent the message
+  string message = 3;                        // Content of the message
+  string messageType = 4;                    // Type of the message (e.g., text, image, etc.)
+  google.protobuf.Timestamp timestamp = 5;   // Timestamp of the message
+  map<string, string> reactions = 6;         // Reactions (userID -> reaction)
+  bool edited = 7;                           // Whether the message has been edited
+  google.protobuf.Timestamp editedTimestamp = 8; // Timestamp of the last edit
+  bool isPinned = 9;                         // Whether the message is pinned
+  repeated string attachments = 10;          // List of file attachments or media URLs
+  repeated User mentionedUsers = 11;         // List of users mentioned in the message
+  string messageContext = 12;                // Context of the message (e.g., thread or conversation ID)
+}
+
+enum serverUpdateReason {
+  USER_CONNECTED = 0;
+  USER_DISCONNECTED = 1;
+  USER_UPDATED = 2;
+  MOTD_UPDATED = 4;
+  SERVER_NAME_UPDATED = 5;
+}
+
+message ServerUpdate {
+  serverUpdateReason reason = 1;             // Reason for the server update
+  repeated Message messages = 2;             // List of messages
+  repeated User connectedUsers = 3;          // List of users
+  int32 userCount = 4;                       // Number of connected users
+  string motd = 5;                           // Message of the day
+  string serverName = 6;                     // Name of the server
+}
+
+message ChatEvent {
+  int32 eventID = 1;                          // Unique identifier for the event
+  google.protobuf.Timestamp eventTimestamp = 2; // Timestamp of the event
+
+  oneof event {
+    Message userMessage = 3;                   // If the event is a user message
+    ServerUpdate serverUpdate = 4;             // If the event is a server update
+    ConnectionInit connectionInit = 5;         // If the event is a connection initialization
+  }
+}
+
+// Diffie-Hellman key exchange and connection initialization message
+message ConnectionInit {
+  int32 initID = 1;                           // Unique identifier for the initialization request
+  bytes clientPublicKey = 2;                  // Client's public key for Diffie-Hellman
+  bytes serverPublicKey = 3;                  // Server's public key for Diffie-Hellman (if available)
+  string clientVersion = 4;                   // Version of the client software
+  string serverVersion = 5;                   // Version of the server software
+  google.protobuf.Timestamp timestamp = 6;    // Timestamp of the initialization
+  bool encryptionEnabled = 7;                 // Whether encryption is enabled for the connection
+  map<string, string> additionalParams = 8;   // Any additional parameters needed during initialization
+}

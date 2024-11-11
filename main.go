@@ -1,52 +1,77 @@
 package main
 
 import (
-	"chatterbox-cli/client"
-	"chatterbox-cli/login"
-	"chatterbox-cli/message"
-	"chatterbox-cli/server"
-	"encoding/gob"
-	"flag"
+	"chatterbox-cli/parser"
+	pb "chatterbox-cli/proto"
+	"chatterbox-cli/serialization"
 	"fmt"
-
-	log "github.com/charmbracelet/log"
+	"os"
 )
 
 func main() {
-	gob.Register(message.Message{})
-	log.SetLevel(log.DebugLevel)
-	var username string
-	var dialAddress string
-	var isServer bool
-	flag.StringVar(&dialAddress, "address", "", "Address to dial")
-	flag.StringVar(&username, "username", "", "Username to use")
-	flag.BoolVar(&isServer, "server", false, "Run as server")
-	flag.Parse()
 
-	if isServer {
-		server.Server(username)
-		return
-	}
-	// if there is no address or username, open the login prompt
-	if dialAddress == "" && username == "" {
-		username, dialAddress := login.FetchLoginData()
-		// clear the terminal
-		fmt.Print("\033[H\033[2J")
-		//append the port to the address (default is 5051)
-		dialAddress = dialAddress + ":5051"
-		client.Client(username, dialAddress)
-		return
-	}
-	// if there is no address but there is a username, throw an error
-	if dialAddress == "" {
-		return
-	}
-	// if there is no username but there is an address, throw an error
-	if username == "" {
-		return
+	json, err := os.ReadFile("user.json")
+	if err != nil {
+		panic(err)
 	}
 
-	// if there is an address and a username, run the client
-	client.Client(username, dialAddress)
+	user, err := parser.ParseUserFromJson(json)
+	if err != nil {
+		panic(err)
+	}
+
+	message := &pb.Message{
+		User:    user,
+		Message: "Hello World",
+	}
+
+	chatEvent := &pb.ChatEvent{
+		EventID: 1,
+		Event: &pb.ChatEvent_UserMessage{
+			UserMessage: message,
+		},
+	}
+
+	fmt.Println("chatEventCration: ", chatEvent)
+
+	serializedChatEvent, err := serialization.SerializeChatEvent(chatEvent)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Print("\n chatEventSerialization: ", serializedChatEvent)
+
+	deserializedChatEvent, err := serialization.DeserializeChatEvent(serializedChatEvent)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("\n chatEventDeserialization: ", deserializedChatEvent)
+
+	serverUpdate := &pb.ServerUpdate{
+		Reason: 1,
+		Motd:   "Hello World",
+	}
+
+	chatEvent2 := &pb.ChatEvent{
+		EventID: 2,
+		Event: &pb.ChatEvent_ServerUpdate{
+			ServerUpdate: serverUpdate,
+		},
+	}
+
+	serializedChatEvent2, err := serialization.SerializeChatEvent(chatEvent2)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Print("\n chatEvent2Serialization: ", serializedChatEvent2)
+
+	deserializedChatEvent2, err := serialization.DeserializeChatEvent(serializedChatEvent2)
+
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println("\n chatEvent2Deserialization: ", deserializedChatEvent2)
 
 }
