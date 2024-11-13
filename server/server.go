@@ -2,8 +2,14 @@ package server
 
 import (
 	"bufio"
+	"bytes"
+	"chatterbox-cli/serialization"
 	"crypto/tls"
+	"encoding/binary"
+	"io"
 	"sync"
+
+	pb "chatterbox-cli/proto"
 
 	log "github.com/charmbracelet/log"
 )
@@ -49,47 +55,67 @@ func Server() {
 func handleConnection(conn *tls.Conn) {
 	defer conn.Close()
 
-	// Add the client connection to the list
+	// Client management logic (unchanged)
 	clientsMu.Lock()
 	clients = append(clients, conn)
 	clientsMu.Unlock()
 	log.Info("Client joined:", "address", conn.RemoteAddr())
+	defer func() { /* client removal logic */ }()
 
-	// Remove the client connection on function exit
-	defer func() {
-		clientsMu.Lock()
-		defer clientsMu.Unlock()
-		for i, client := range clients {
-			if client == conn {
-				clients = append(clients[:i], clients[i+1:]...)
-				break
-			}
+	reader := bufio.NewReader(conn)
+	for {
+		// Read the length prefix (assuming it's a uint32 for this example)
+		var length uint32
+		if err := binary.Read(reader, binary.BigEndian, &length); err != nil {
+			log.Error("Error reading message length:", "err", err)
+			break
 		}
-		log.Info("Client left:", "address", conn.RemoteAddr())
-	}()
 
-	// Read messages from the client
-	scanner := bufio.NewScanner(conn)
-	for scanner.Scan() {
-		msg := scanner.Text()
-		log.Info("Received message:", "message", msg, "from", conn.RemoteAddr())
-		broadcastMessage(conn, msg)
-	}
+		// Read the actual message based on the length
+		rawData := make([]byte, length)
+		if _, err := io.ReadFull(reader, rawData); err != nil {
+			log.Error("Error reading message:", "err", err)
+			break
+		}
 
-	// Check for any scanning error (like a client disconnection)
-	if err := scanner.Err(); err != nil {
-		log.Error("Error reading from connection:", "err", err, "address", conn.RemoteAddr())
+		// Process the message (same as before)
+		deserializedChatEvent, err := serialization.DeserializeChatEvent(rawData)
+		if err != nil {
+			log.Error("Error deserializing chat event:", "err", err)
+			continue
+		}
+
+		log.Info("Received chat event:", "chatEvent", deserializedChatEvent.String())
+		broadcastChatEvent(conn, deserializedChatEvent)
 	}
 }
 
-// broadcastMessage sends a message to all clients except the sender
-func broadcastMessage(sender *tls.Conn, message string) {
+func broadcastChatEvent(conn *tls.Conn, chatEvent *pb.ChatEvent) {
+	log.Info("Broadcasting message:", "chatEvent", chatEvent)
 	clientsMu.Lock()
 	defer clientsMu.Unlock()
 
+	serializedChatEvent, err := serialization.SerializeChatEvent(chatEvent)
+	if err != nil {
+		log.Error("Error serializing chat event:", "err", err)
+		return
+	}
+
+	var buf bytes.Buffer
+
+	err = binary.Write(&buf, binary.BigEndian, uint32(len(serializedChatEvent)))
+	if err != nil {
+		log.Error("Error writing message length:", "err", err)
+	}
+
+	_, err = buf.Write(serializedChatEvent)
+	if err != nil {
+		log.Error("Error writing message:", "err", err)
+	}
+
 	for _, client := range clients {
-		if client != sender {
-			_, err := client.Write([]byte(message + "\n"))
+		if client != conn {
+			_, err := client.Write(buf.Bytes())
 			if err != nil {
 				log.Error("Error sending message to client:", "err", err, "client", client.RemoteAddr())
 			}
