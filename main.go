@@ -1,14 +1,33 @@
 package main
 
 import (
+	"chatterbox-cli/client"
 	"chatterbox-cli/parser"
 	pb "chatterbox-cli/proto"
 	"chatterbox-cli/serialization"
+	"chatterbox-cli/server"
 	"fmt"
 	"os"
 )
 
+func readServerMode(prompt string) bool {
+	fmt.Print(prompt)
+	fmt.Println()
+	var serverMode bool
+	var input string
+	fmt.Scanln(&input)
+	if input == "y" {
+		serverMode = true
+	} else {
+		serverMode = false
+	}
+	return serverMode
+}
+
 func main() {
+
+	// ask if you want to run in server mode or client mode
+	serverMode := readServerMode("Do you want to run in server mode? (y/n): ")
 
 	json, err := os.ReadFile("user.json")
 	if err != nil {
@@ -73,5 +92,11 @@ func main() {
 	}
 
 	fmt.Println("\n chatEvent2Deserialization: ", deserializedChatEvent2)
+
+	if serverMode {
+		server.Server()
+	} else {
+		client.Client()
+	}
 
 }
