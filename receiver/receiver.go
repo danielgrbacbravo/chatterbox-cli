@@ -1,7 +1,6 @@
 package receiver
 
 import (
-	"bufio"
 	"chatterbox-cli/serialization"
 	"crypto/tls"
 	"encoding/binary"
@@ -13,44 +12,47 @@ import (
 )
 
 func ReceiveChatEvents(conn *tls.Conn, chatEvents chan *pb.ChatEvent) {
-	defer close(chatEvents) // Close the channel when we're done
+	defer close(chatEvents)
+	log.Info("Starting chat event receiver")
 
-	reader := bufio.NewReader(conn)
+	lengthBuf := make([]byte, 4)
 	for {
-		// Read the length prefix (assuming it's a uint32 for this example)
-		var length uint32
-		log.Info("Attempting to read message length")
-		err := binary.Read(reader, binary.BigEndian, &length)
+		log.Info("Waiting for next message length...")
+		// Read exactly 4 bytes for the length prefix
+		_, err := io.ReadFull(conn, lengthBuf)
 		if err != nil {
-			log.Error("Error reading message length:", "err", err)
-			// Possibly log the reader buffer here to see if data is being received
-			break
-		}
-		log.Info("Message length received:", "length", length)
-
-		// Read the actual message based on the length
-		rawData := make([]byte, length)
-		_, err = io.ReadFull(reader, rawData)
-		if err != nil {
-			// Handle the case where the connection was closed unexpectedly
 			if err == io.EOF {
-				log.Info("Client disconnected")
-				break
+				log.Info("Connection closed")
+				return
 			}
-			log.Error("Error reading message:", "err", err)
-			break
+			log.Error("Error reading message length:", "err", err)
+			return
 		}
 
-		// Process the message (deserialize it)
-		log.Info("Received raw data:", "rawData", rawData)
+		length := binary.BigEndian.Uint32(lengthBuf)
+		log.Info("Received message length indicator:", "length", length)
+
+		// Read the message payload
+		rawData := make([]byte, length)
+		_, err = io.ReadFull(conn, rawData)
+		if err != nil {
+			if err == io.EOF {
+				log.Info("Connection closed during message read")
+				return
+			}
+			log.Error("Error reading message payload:", "err", err)
+			return
+		}
+
+		log.Info("Received raw data of length:", "bytes", len(rawData))
+
 		deserializedChatEvent, err := serialization.DeserializeChatEvent(rawData)
 		if err != nil {
 			log.Error("Error deserializing chat event:", "err", err)
 			continue
 		}
 
-		// Send the deserialized chat event to the channel
-		log.Info("Received chat event:", "chatEvent", deserializedChatEvent.String())
+		log.Info("Successfully deserialized chat event, sending to channel")
 		chatEvents <- deserializedChatEvent
 	}
 }

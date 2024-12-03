@@ -25,20 +25,6 @@ func Client() {
 		panic(err)
 	}
 
-	message := &pb.Message{
-		User:    user,
-		Message: "Hello World",
-	}
-
-	chatEvent := &pb.ChatEvent{
-		EventID: 1,
-		Event: &pb.ChatEvent_UserMessage{
-			UserMessage: message,
-		},
-	}
-
-	fmt.Println("chatEventCreation: ", chatEvent)
-
 	// Configure the TLS connection
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: true, // Disable verification for self-signed certs; use `false` for production
@@ -51,23 +37,54 @@ func Client() {
 	}
 	defer conn.Close()
 
-	// begin go routine for receiving chat events
-	chatEventChan := make(chan *pb.ChatEvent)
-	userInputChan := make(chan string)
-	// begin go routine for receiving chat events
-	go receiver.ReceiveChatEvents(conn, chatEventChan)
-	// begin go routine for printing chat events
-	go sender.SendUserMessages(conn, userInputChan, user)
-	// Goroutine to listen for user input
+	sendChatEventChan := make(chan *pb.ChatEvent)
+	receiveChatEventChan := make(chan *pb.ChatEvent)
+
+	go receiver.ReceiveChatEvents(conn, receiveChatEventChan)
+	go sender.SendChatEvent(conn, sendChatEventChan)
+
+	// Start message receiver goroutine
+	go func() {
+		fmt.Println("Message receiver started...")
+		for chatEvent := range receiveChatEventChan {
+			switch event := chatEvent.Event.(type) {
+			case *pb.ChatEvent_UserMessage:
+				// Clear current line
+				fmt.Printf("\r\033[K") // Clear the current line
+				// Print received message
+				fmt.Printf("\n%s: %s\n", event.UserMessage.User.DisplayName, event.UserMessage.Message)
+				// Reprint prompt
+				fmt.Print("Enter message: ")
+			}
+		}
+		fmt.Println("Message receiver stopped")
+	}()
+
 	go func() {
 		reader := bufio.NewReader(os.Stdin)
 		for {
 			fmt.Print("Enter message: ")
-			userInput, _ := reader.ReadString('\n')
+			userInput, err := reader.ReadString('\n')
+			if err != nil {
+				fmt.Println("Error reading input:", "err", err)
+				continue
+			}
+
 			userInput = strings.TrimSpace(userInput)
-			// check if text isnt empty
 			if userInput != "" {
-				userInputChan <- userInput
+				message := &pb.Message{
+					User:    user,
+					Message: userInput,
+				}
+
+				chatEvent := &pb.ChatEvent{
+					EventID: 1,
+					Event: &pb.ChatEvent_UserMessage{
+						UserMessage: message,
+					},
+				}
+				sendChatEventChan <- chatEvent
+				fmt.Println("Message queued for sending")
 			}
 		}
 	}()

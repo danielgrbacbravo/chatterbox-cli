@@ -1,8 +1,6 @@
 package server
 
 import (
-	"bufio"
-	"bytes"
 	"chatterbox-cli/serialization"
 	"crypto/tls"
 	"encoding/binary"
@@ -55,30 +53,52 @@ func Server() {
 func handleConnection(conn *tls.Conn) {
 	defer conn.Close()
 
-	// Client management logic (unchanged)
+	// Client management logic
 	clientsMu.Lock()
 	clients = append(clients, conn)
+	clientIndex := len(clients) - 1
 	clientsMu.Unlock()
+
 	log.Info("Client joined:", "address", conn.RemoteAddr())
-	defer func() { /* client removal logic */ }()
 
-	reader := bufio.NewReader(conn)
+	// Proper client cleanup on disconnect
+	defer func() {
+		clientsMu.Lock()
+		if clientIndex < len(clients) {
+			clients = append(clients[:clientIndex], clients[clientIndex+1:]...)
+		}
+		clientsMu.Unlock()
+		log.Info("Client left:", "address", conn.RemoteAddr())
+	}()
+
+	lengthBuf := make([]byte, 4)
 	for {
-		// Read the length prefix (assuming it's a uint32 for this example)
-		var length uint32
-		if err := binary.Read(reader, binary.BigEndian, &length); err != nil {
+		// Read exactly 4 bytes for the length prefix
+		_, err := io.ReadFull(conn, lengthBuf)
+		if err != nil {
+			if err == io.EOF {
+				log.Info("Connection closed")
+				return
+			}
 			log.Error("Error reading message length:", "err", err)
-			break
+			return
 		}
 
-		// Read the actual message based on the length
+		length := binary.BigEndian.Uint32(lengthBuf)
+
+		// Read the message payload
 		rawData := make([]byte, length)
-		if _, err := io.ReadFull(reader, rawData); err != nil {
+		_, err = io.ReadFull(conn, rawData)
+		if err != nil {
+			if err == io.EOF {
+				log.Info("Connection closed during message read")
+				return
+			}
 			log.Error("Error reading message:", "err", err)
-			break
+			return
 		}
 
-		// Process the message (same as before)
+		// Process the message
 		deserializedChatEvent, err := serialization.DeserializeChatEvent(rawData)
 		if err != nil {
 			log.Error("Error deserializing chat event:", "err", err)
@@ -90,10 +110,12 @@ func handleConnection(conn *tls.Conn) {
 	}
 }
 
-func broadcastChatEvent(conn *tls.Conn, chatEvent *pb.ChatEvent) {
-	log.Info("Broadcasting message:", "chatEvent", chatEvent)
+func broadcastChatEvent(sender *tls.Conn, chatEvent *pb.ChatEvent) {
+	log.Info("Starting broadcast to all clients")
 	clientsMu.Lock()
 	defer clientsMu.Unlock()
+
+	log.Info("Number of connected clients:", "count", len(clients))
 
 	serializedChatEvent, err := serialization.SerializeChatEvent(chatEvent)
 	if err != nil {
@@ -101,23 +123,32 @@ func broadcastChatEvent(conn *tls.Conn, chatEvent *pb.ChatEvent) {
 		return
 	}
 
-	var buf bytes.Buffer
-	err = binary.Write(&buf, binary.BigEndian, uint32(len(serializedChatEvent)))
-	if err != nil {
-		log.Error("Error writing message length:", "err", err)
-	}
+	message := make([]byte, 4+len(serializedChatEvent))
+	binary.BigEndian.PutUint32(message[:4], uint32(len(serializedChatEvent)))
+	copy(message[4:], serializedChatEvent)
 
-	_, err = buf.Write(serializedChatEvent)
-	if err != nil {
-		log.Error("Error writing message:", "err", err)
-	}
+	log.Info("Prepared message for broadcast:", "messageLength", len(message))
 
-	for _, client := range clients {
-		if client != conn {
-			_, err := client.Write(buf.Bytes())
+	var failedClients []int
+	for i, client := range clients {
+		if client != sender { // Skip the sender
+			log.Info("Attempting to send to client:", "address", client.RemoteAddr())
+			n, err := client.Write(message)
 			if err != nil {
 				log.Error("Error sending message to client:", "err", err, "client", client.RemoteAddr())
+				failedClients = append(failedClients, i)
+			} else {
+				log.Info("Successfully sent message to client:", "address", client.RemoteAddr(), "bytes", n)
 			}
+		} else {
+			log.Info("Skipping sender:", "address", client.RemoteAddr())
 		}
+	}
+
+	// Remove failed clients in reverse order
+	for i := len(failedClients) - 1; i >= 0; i-- {
+		failedIndex := failedClients[i]
+		clients = append(clients[:failedIndex], clients[failedIndex+1:]...)
+		log.Info("Removed failed client at index:", "index", failedIndex)
 	}
 }
