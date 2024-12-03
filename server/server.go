@@ -102,7 +102,6 @@ func broadcastChatEvent(conn *tls.Conn, chatEvent *pb.ChatEvent) {
 	}
 
 	var buf bytes.Buffer
-
 	err = binary.Write(&buf, binary.BigEndian, uint32(len(serializedChatEvent)))
 	if err != nil {
 		log.Error("Error writing message length:", "err", err)

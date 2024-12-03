@@ -10,7 +10,6 @@ import (
 )
 
 func SendUserMessages(conn *tls.Conn, userInputChan chan string, user *pb.User) {
-
 	for {
 		userInput := <-userInputChan
 
