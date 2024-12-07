@@ -64,6 +64,7 @@ func Client() {
 		reader := bufio.NewReader(os.Stdin)
 		for {
 			fmt.Print("Enter message: ")
+
 			userInput, err := reader.ReadString('\n')
 			if err != nil {
 				fmt.Println("Error reading input:", "err", err)
@@ -84,7 +85,6 @@ func Client() {
 					},
 				}
 				sendChatEventChan <- chatEvent
-				fmt.Println("Message queued for sending")
 			}
 		}
 	}()

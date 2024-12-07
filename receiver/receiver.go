@@ -17,7 +17,6 @@ func ReceiveChatEvents(conn *tls.Conn, chatEvents chan *pb.ChatEvent) {
 
 	lengthBuf := make([]byte, 4)
 	for {
-		log.Info("Waiting for next message length...")
 		// Read exactly 4 bytes for the length prefix
 		_, err := io.ReadFull(conn, lengthBuf)
 		if err != nil {
@@ -30,7 +29,6 @@ func ReceiveChatEvents(conn *tls.Conn, chatEvents chan *pb.ChatEvent) {
 		}
 
 		length := binary.BigEndian.Uint32(lengthBuf)
-		log.Info("Received message length indicator:", "length", length)
 
 		// Read the message payload
 		rawData := make([]byte, length)
@@ -44,15 +42,12 @@ func ReceiveChatEvents(conn *tls.Conn, chatEvents chan *pb.ChatEvent) {
 			return
 		}
 
-		log.Info("Received raw data of length:", "bytes", len(rawData))
-
 		deserializedChatEvent, err := serialization.DeserializeChatEvent(rawData)
 		if err != nil {
 			log.Error("Error deserializing chat event:", "err", err)
 			continue
 		}
 
-		log.Info("Successfully deserialized chat event, sending to channel")
 		chatEvents <- deserializedChatEvent
 	}
 }
