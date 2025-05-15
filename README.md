@@ -1,8 +1,8 @@
 # Chatterbox CLI
 
-Chatterbox CLI is a simple chat application that runs on the command line interface. It is a learning exercise that demonstrates the use of Go language for network programming, cryptography for secure communication, and the Bubbletea library for building user interfaces in the terminal.
+Chatterbox CLI is a simple chat application that runs on the command line interface. It is a learning exercise that demonstrates the use of Go language for network programming, Protocol Buffers for serialization, and the Bubbletea library for building user interfaces in the terminal.
 
-This project includes a server and a client that communicate over TCP. The server can handle multiple client connections. The messages are encrypted and decrypted using a Diffie-Hellman key exchange and AES encryption for secure communication.
+This project includes a server and a client that communicate over TCP. The server can handle multiple client connections. The messages are serialized and deserialized using Protocol Buffers for efficient communication, replacing the custom Diffie-Hellman key exchange and AES encryption approach from previous versions.
 
 ## Building the Project
 
@@ -56,8 +56,8 @@ This will start the server inside the Docker container. You can then run the cli
 
 ## Learning Experience
 
-In this project, I dove into the intricacies of network programming using Go, explored the realm of cryptography for ensuring secure communication, and tackled the challenge of building user interfaces in the terminal with the help of the Bubbletea library. My journey was marked by the hands-on experience of managing multiple client connections on a server, implementing key exchanges for securing those connections, and mastering the creation and manipulation of terminal-based user interfaces. This undertaking was not just about coding; it was about learning, exploring, and pushing the boundaries of what I could achieve with these technologies.
+In this project, I dove into the intricacies of network programming using Go, explored Protocol Buffers for efficient data serialization, and tackled the challenge of building user interfaces in the terminal with the help of the Bubbletea library. My journey was marked by the hands-on experience of managing multiple client connections on a server, implementing message serialization for efficient communication, and mastering the creation and manipulation of terminal-based user interfaces. This undertaking was not just about coding; it was about learning, exploring, and pushing the boundaries of what I could achieve with these technologies.
 
 ## Note
 
-This project is purely for learning and skill-building purposes. It is not intended to be used for production-level applications.
+This project is purely for learning and skill-building purposes. It is not intended to be used for production-level applications. Currently, the main event loop contains several bugs that may cause unexpected behavior, crashes
